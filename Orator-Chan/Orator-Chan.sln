@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29409.12
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orator-Chan", "Orator-Chan.csproj", "{C84E9969-97DD-4A95-86DA-74C1D4011030}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C84E9969-97DD-4A95-86DA-74C1D4011030}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C84E9969-97DD-4A95-86DA-74C1D4011030}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C84E9969-97DD-4A95-86DA-74C1D4011030}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C84E9969-97DD-4A95-86DA-74C1D4011030}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {20339C1F-FE1B-40A6-BF46-E0FED366F184}
+	EndGlobalSection
+EndGlobal
