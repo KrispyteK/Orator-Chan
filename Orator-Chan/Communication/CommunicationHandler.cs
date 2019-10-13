@@ -110,7 +110,7 @@ namespace OratorChan {
                 var max = wordSet.Words.Values.Max();
                 var choice = _random.Next(0, Math.Max(max - repetition, 0));
 
-                var keys = wordSet.Words.Keys.OrderBy(x => _random.NextDouble());
+                var keys = wordSet.Words.Keys.OrderByDescending(x => _random.NextDouble() > 0.5d);
 
                 // Choose next word based on frequency
                 foreach (var key in keys) {
@@ -163,10 +163,10 @@ namespace OratorChan {
         }
 
         public async Task LearnFromString(string message) {
-            var words = message.Trim().Split(" ");
+            var words = message.Trim().Split(new char[] { ' ', '\t', '\n' });
 
             for (int i = 0; i < words.Length; i++) {
-                var word = words[i];
+                var word = words[i].Trim();
                 var nextWord = i < words.Length - 1 ? words[i + 1] : string.Empty;
 
                 if (wordData.ContainsKey(word)) {
