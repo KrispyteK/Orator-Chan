@@ -6,4 +6,9 @@
     <RootNamespace>Orator_Chan</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Discord.Net" Version="2.1.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3-beta2" />
+  </ItemGroup>
+
 </Project>
