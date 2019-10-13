@@ -8,7 +8,10 @@ using Newtonsoft.Json.Linq;
 
 namespace OratorChan {
     class Program {
-        private Client _client;       
+        private Client _client;
+        private CommandHandler _commandHandler;
+        private OratorCommandService _commandService;
+        private CommunicationHandler _communicationHandler;
 
         public static void Main(string[] args)
             => new Program().MainAsync().GetAwaiter().GetResult();
@@ -19,6 +22,13 @@ namespace OratorChan {
             _client.Config = RetrieveConfig();
             _client.Log += Log;
             _client.MessageReceived += MessageReceived;
+
+            _commandService = new OratorCommandService();
+            _commandHandler = new CommandHandler(_client, _commandService);
+
+            await _commandHandler.InstallCommandsAsync();
+
+            _communicationHandler = new CommunicationHandler(_client);
 
             await _client.LoginAsync(TokenType.Bot, _client.Config.Token);
             await _client.StartAsync();
