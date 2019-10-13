@@ -9,29 +9,21 @@ using Newtonsoft.Json.Linq;
 namespace OratorChan {
     class Program {
 
-        public JObject localconfig;
-        private DiscordSocketClient _client;
-        
+        public Configuration config;
+        private DiscordSocketClient _client;       
 
         public static void Main(string[] args)
             => new Program().MainAsync().GetAwaiter().GetResult();
 
         public async Task MainAsync () {
-            localconfig = RetrieveConfig();
-
+            config = RetrieveConfig();
 
             _client = new DiscordSocketClient();
 
             _client.Log += Log;
+            _client.MessageReceived += MessageReceived;
 
-            // Remember to keep token private or to read it from an 
-            // external source! In this case, we are reading the token 
-            // from an environment variable. If you do not know how to set-up
-            // environment variables, you may find more information on the 
-            // Internet or by using other methods such as reading from 
-            // a configuration.
-            await _client.LoginAsync(TokenType.Bot,
-                localconfig.GetValue("DiscordToken").ToString());
+            await _client.LoginAsync(TokenType.Bot,config.Token);
             await _client.StartAsync();
 
             // Block this task until the program is closed.
@@ -43,10 +35,20 @@ namespace OratorChan {
             return Task.CompletedTask;
         }
 
-        private JObject RetrieveConfig () {
-            using (StreamReader file = File.OpenText(@$"{Environment.CurrentDirectory}\Config\localconfig.json"))
+        private async Task MessageReceived(SocketMessage message) {
+
+            if (message.Content.StartsWith(config.Prefix)) {
+
+                if (message.Content == "!ping") {
+                    await message.Channel.SendMessageAsync("Pong!");
+                }
+            }
+        }
+
+        private Configuration RetrieveConfig () {
+            using (StreamReader file = File.OpenText(@$"{Environment.CurrentDirectory}\Resources\config.json"))
             using (JsonTextReader reader = new JsonTextReader(file)) {
-                return (JObject)JToken.ReadFrom(reader);
+                return JToken.ReadFrom(reader).ToObject<Configuration>();
             }
         }
     }
