@@ -8,22 +8,19 @@ using Newtonsoft.Json.Linq;
 
 namespace OratorChan {
     class Program {
-
-        public Configuration config;
-        private DiscordSocketClient _client;       
+        private Client _client;       
 
         public static void Main(string[] args)
             => new Program().MainAsync().GetAwaiter().GetResult();
 
         public async Task MainAsync () {
-            config = RetrieveConfig();
+            _client = new Client();
 
-            _client = new DiscordSocketClient();
-
+            _client.Config = RetrieveConfig();
             _client.Log += Log;
             _client.MessageReceived += MessageReceived;
 
-            await _client.LoginAsync(TokenType.Bot,config.Token);
+            await _client.LoginAsync(TokenType.Bot, _client.Config.Token);
             await _client.StartAsync();
 
             // Block this task until the program is closed.
@@ -36,13 +33,12 @@ namespace OratorChan {
         }
 
         private async Task MessageReceived(SocketMessage message) {
+            //if (message.Content.StartsWith(config.Prefix)) {
 
-            if (message.Content.StartsWith(config.Prefix)) {
-
-                if (message.Content == "!ping") {
-                    await message.Channel.SendMessageAsync("Pong!");
-                }
-            }
+            //    if (message.Content == "!ping") {
+            //        await message.Channel.SendMessageAsync("Pong!");
+            //    }
+            //}
         }
 
         private Configuration RetrieveConfig () {

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace OratorChan {
     [Serializable]
-    class Configuration {
+    public class Configuration {
         public string Token { get; set; }
         public string Prefix { get; set; }
     }
