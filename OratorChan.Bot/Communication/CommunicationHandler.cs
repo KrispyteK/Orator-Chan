@@ -27,8 +27,9 @@ namespace OratorChan.Bot.Communication
 		{
 			_client = client;
 			_client.MessageReceived += HandleMessageAsync;
+            _client.Ready += LearnNewMessages;
 
-			wordData = Program.GetResource<Dictionary<string, WordSet>>("Data", new Dictionary<string, WordSet>());
+            wordData = Program.GetResource<Dictionary<string, WordSet>>("Data", new Dictionary<string, WordSet>());
 			_timer = new Timer(new TimerCallback(SaveData), this, 1000, 10000);
 		}
 
@@ -74,7 +75,7 @@ namespace OratorChan.Bot.Communication
 
 			if (message.Author.Id == _client.CurrentUser.Id) return;
 
-			if (_client.Config.LearningChannels.Contains(message.Channel.Id))
+			if (_client.GuildData.LearningChannels.Contains(message.Channel.Id))
 			{
 
 				// Create a number to track where the prefix ends and the command begins
@@ -91,7 +92,7 @@ namespace OratorChan.Bot.Communication
 				SetLatestMessage(message);
 			}
 
-			if (_client.Config.ReplyChannels.Contains(message.Channel.Id))
+			if (_client.GuildData.ReplyChannels.Contains(message.Channel.Id))
 			{
 				var constructedMessage = ConstructMessage(message.Content.Split(' '));
 
@@ -297,5 +298,20 @@ namespace OratorChan.Bot.Communication
 				newerMessages = await channel.GetMessagesAsync(channelData.lastMessageLearned, Direction.After).FlattenAsync();
 			}
 		}
-	}
+
+        public async Task LearnNewMessages() {
+            var guild = _client.Guilds.FirstOrDefault(x => x.Id == _client.GuildData.Guild);
+            var baseChannel = guild.GetTextChannel(_client.GuildData.BaseChannel) as ITextChannel;
+
+            foreach (var kv in _client.GuildData.Channels) {
+                var channel = guild.GetTextChannel(kv.Key) as ITextChannel;
+
+                await baseChannel.SendMessageAsync($"Learning new messages from {channel.Name}");
+
+                await LearnFromChannel(channel);
+            }
+
+            SetDirty();
+        }
+    }
 }
