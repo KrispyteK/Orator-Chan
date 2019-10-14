@@ -29,10 +29,16 @@ namespace OratorChan {
         }
 
         private async Task SaveData() {
-            // serialize JSON directly to a file
             using (StreamWriter file = File.CreateText(@$"{Environment.CurrentDirectory}\Resources\data.json")) {
                 JsonSerializer serializer = new JsonSerializer();
                 serializer.Serialize(file, wordData);
+            }
+        }
+
+        private async Task SaveGuildData () {
+            using (StreamWriter file = File.CreateText(@$"{Environment.CurrentDirectory}\Resources\guilddata.json")) {
+                JsonSerializer serializer = new JsonSerializer();
+                serializer.Serialize(file, _client.GuildData);
             }
         }
 
@@ -45,10 +51,21 @@ namespace OratorChan {
             _hasData = true;
         }
 
+        private void SetLatestMessage(IMessage message) {
+            if (!_client.GuildData.Channels.ContainsKey(message.Channel.Id)) {
+                _client.GuildData.Channels[message.Channel.Id] = new ChannelData {
+                    lastMessageLearned = message.Id,
+                    oldestMessageLearned = message.Id
+                };
+            }
+            else {
+                _client.GuildData.Channels[message.Channel.Id].lastMessageLearned = message.Id;
+            }
+        }
+
         private async Task HandleMessageAsync(SocketMessage messageParam) {
             // Don't process the command if it was a system message
-            var message = messageParam as SocketUserMessage;
-            if (message == null) return;
+            if (!(messageParam is SocketUserMessage message)) return;
 
             if (message.Author.Id == _client.CurrentUser.Id) return;
 
@@ -56,7 +73,7 @@ namespace OratorChan {
                 await GetData();
             }
 
-            if (_client.Config.LearningChannels.Contains(message.Channel.Id.ToString())) {
+            if (_client.Config.LearningChannels.Contains(message.Channel.Id)) {
 
                 // Create a number to track where the prefix ends and the command begins
                 int argPos = 0;
@@ -65,10 +82,14 @@ namespace OratorChan {
                 if (message.HasCharPrefix(_client.Config.Prefix[0], ref argPos))
                     return;
 
+                //await LearnFromString(message.Content);
+
                 await LearnFromString(message.Content);
+
+                SetLatestMessage(message);
             }
 
-            if (_client.Config.ReplyChannels.Contains(message.Channel.Id.ToString())) {
+            if (_client.Config.ReplyChannels.Contains(message.Channel.Id)) {
                 var constructedMessage = ConstructMessage(message.Content.Split(' '));
 
                 await message.Channel.SendMessageAsync(constructedMessage);
@@ -121,6 +142,7 @@ namespace OratorChan {
                         if (checkWord == word) {
                             // If a word is repeated too much there's a bigger chance there's going to be a different word next.
                             if (repetition > 0 && _random.NextDouble() > 1 / repetition) {
+                                choice = _random.Next(0, Math.Max(max - repetition, 0));
                                 continue;
                             }
 
@@ -178,6 +200,77 @@ namespace OratorChan {
 
                     wordData[word] = newWordSet;
                 }
+            }
+        }
+
+        public async Task LearnChannelHistory (ITextChannel channel) {
+            var lastMessages = await channel.GetMessagesAsync(1, CacheMode.AllowDownload, RequestOptions.Default).FlattenAsync();
+            var lastMessage = lastMessages.First();
+            int messagesLearned = 0;
+
+            if (!_client.GuildData.Channels.ContainsKey(channel.Id)) {
+                _client.GuildData.Channels[channel.Id] = new ChannelData {
+                    lastMessageLearned = lastMessage.Id,
+                    oldestMessageLearned = lastMessage.Id
+                };
+            }
+
+            var channelData = _client.GuildData.Channels[channel.Id];
+
+            while (!channelData.hasOldestMessage) {
+                var messages = await channel.GetMessagesAsync(channelData.oldestMessageLearned, Direction.Before).FlattenAsync();
+
+                if (!messages.Any()) {
+                    channelData.hasOldestMessage = true;
+
+                    await channel.SendMessageAsync($"Succesfully learned full channel history!");
+
+                    await SaveGuildData();
+                    await SaveData();
+
+                    break;
+                }
+
+                foreach (var msg in messages) {
+                    if (msg.Author.Id == _client.CurrentUser.Id) continue;
+
+                    await LearnFromString(msg.Content);
+
+                    messagesLearned++;
+                }
+
+                channelData.oldestMessageLearned = messages.Last().Id;
+                Console.WriteLine($"Learned from {messagesLearned} messages.");
+            }
+        }
+
+        public async Task LearnFromChannel (ITextChannel channel) {
+            var lastMessages = await channel.GetMessagesAsync(1, CacheMode.AllowDownload, RequestOptions.Default).FlattenAsync();
+            var lastMessage = lastMessages.First();
+
+            if (!_client.GuildData.Channels.ContainsKey(channel.Id)) {
+                _client.GuildData.Channels[channel.Id] = new ChannelData {
+                    lastMessageLearned = lastMessage.Id,
+                    oldestMessageLearned = lastMessage.Id
+                };
+            }
+
+            var channelData = _client.GuildData.Channels[channel.Id];
+
+            var newerMessages = await channel.GetMessagesAsync(channelData.lastMessageLearned, Direction.After).FlattenAsync();
+
+            while (newerMessages.Any()) {
+                Console.WriteLine($"Learning from {newerMessages.Count()} messages.");
+
+                foreach (var msg in newerMessages) {
+                    if (msg.Author.Id == _client.CurrentUser.Id) continue;
+
+                    await LearnFromString(msg.Content);
+                }
+
+                channelData.lastMessageLearned = newerMessages.Last().Id;
+
+                newerMessages = await channel.GetMessagesAsync(channelData.lastMessageLearned, Direction.After).FlattenAsync();
             }
         }
     }
