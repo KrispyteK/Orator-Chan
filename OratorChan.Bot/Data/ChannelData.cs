@@ -12,5 +12,8 @@ namespace OratorChan.Bot.Data
 		public bool hasOldestMessage;
 		public bool hasNewestMessage;
 
+		public bool learn;
+		public bool reply;
+
 	}
 }

@@ -8,10 +8,14 @@ namespace OratorChan.Bot.Data
 	public class GuildData 
     {
         public ulong Guild { get; set; }
-        public ulong BaseChannel { get; set; }
-        public ulong[] LearningChannels { get; set; }
-        public ulong[] ReplyChannels { get; set; }
+		public ulong BaseChannel { get; set; } = 0;
+		public ulong[] ReplyChannels { get; set; } = { };
 
         public Dictionary<ulong, ChannelData> Channels { get; private set; } = new Dictionary<ulong, ChannelData>();
+
+		public void Save()
+		{
+			Program.SaveResource(this);
+		}
     }
 }

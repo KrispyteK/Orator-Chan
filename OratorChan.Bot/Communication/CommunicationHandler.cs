@@ -16,40 +16,17 @@ namespace OratorChan.Bot.Communication
 
 	public class CommunicationHandler
 	{
-		public Dictionary<string, WordSet> wordData;
-		private bool _dirtyData;
 
 		private readonly Client _client;
 		private readonly Random _random = new Random();
-		private readonly Timer _timer;
+		private readonly Learning _learning = new Learning();
 
 		public CommunicationHandler(Client client)
 		{
 			_client = client;
 			_client.MessageReceived += HandleMessageAsync;
-            _client.Ready += LearnNewMessages;
 
-            wordData = Program.GetResource<Dictionary<string, WordSet>>("Data", new Dictionary<string, WordSet>());
-			_timer = new Timer(new TimerCallback(SaveData), this, 1000, 10000);
-		}
-
-		private static void SaveData(object communicationHandler)
-		{
-			var state = communicationHandler as CommunicationHandler;
-			if (!state._dirtyData)
-			{
-				return;
-			}
-
-			Program.SaveResource("Data", state.wordData);
-			Program.SaveResource(state._client.GuildData);
-
-			state._dirtyData = false;
-		}
-
-		public void SetDirty()
-		{
-			_dirtyData = true;
+			_client.Ready += LearnNewMessages;
 		}
 
 		private void SetLatestMessage(IMessage message)
@@ -75,7 +52,14 @@ namespace OratorChan.Bot.Communication
 
 			if (message.Author.Id == _client.CurrentUser.Id) return;
 
-			if (_client.GuildData.LearningChannels.Contains(message.Channel.Id))
+			if (!_client.GuildData.Channels.ContainsKey(message.Channel.Id))
+			{
+				return;
+			}
+
+			ChannelData data = _client.GuildData.Channels[message.Channel.Id];
+
+			if (data.learn)
 			{
 
 				// Create a number to track where the prefix ends and the command begins
@@ -85,136 +69,105 @@ namespace OratorChan.Bot.Communication
 				if (message.HasCharPrefix(_client.Config.Prefix[0], ref argPos))
 					return;
 
-				//await LearnFromString(message.Content);
 
-				await LearnFromString(message.Content);
+				await _learning.LearnFromString(message.Content);
 
 				SetLatestMessage(message);
 			}
 
-			if (_client.GuildData.ReplyChannels.Contains(message.Channel.Id))
+			if (data.reply)
 			{
 				var constructedMessage = ConstructMessage(message.Content.Split(' '));
+
+				if (constructedMessage.Trim().Length == 0)
+				{
+					return;
+				}
 
 				await message.Channel.SendMessageAsync(constructedMessage);
 			}
 		}
 
-		public string RemovePunctuation(string str)
-		{
-			return str.Replace(",", "").Replace(".", "").Replace("?", "").Replace("!", "");
-		}
-
 		public string ConstructMessage(string[] referenceWords = null)
 		{
-			var word = string.Empty;
+			WordSet currentWord = _learning.GetWord(referenceWords[_random.Next(0, referenceWords.Length - 1)]);
 
-			if (referenceWords != null)
+			string message = "";
+			bool lastPunctuation = false;
+			int length = 0;
+
+			List<string> usedReferences = new List<string>();
+
+			do
 			{
-				var reference = referenceWords[_random.Next(0, referenceWords.Length - 1)];
 
-				var find = wordData.Keys.ToList().Find(x => RemovePunctuation(x).ToLower() == RemovePunctuation(reference).ToLower());
+				usedReferences.Add(currentWord.Word);
 
-				word = find ?? reference;
-			}
-			else
-			{
-				word = wordData.ElementAt(_random.Next(0, wordData.Keys.Count - 1)).Key;
-			}
-
-			var message = word;
-			int repetition = 0;
-			string latestSubString = string.Empty;
-
-			while ((word != string.Empty && !word.EndsWith('.') && !word.EndsWith('?') && !word.EndsWith('!')) && message.Length < 1900)
-			{
-				var wordSet = wordData[word];
-				var max = wordSet.Words.Values.Max();
-				var choice = _random.Next(0, Math.Max(max - repetition, 0));
-
-				var keys = wordSet.Words.Keys.OrderByDescending(x => _random.NextDouble() > 0.5d);
-
-				// Choose next word based on frequency
-				foreach (var key in keys)
+				if (string.IsNullOrEmpty(message))
 				{
-					var value = wordSet.Words[key];
-					var checkWord = key;
-
-					if (value >= choice)
+					message = string.Format("{0}{1}", char.ToUpper(currentWord.Word[0]), currentWord.Word.Substring(1));
+				} else
+				{
+					var word = currentWord.Word;
+					if (lastPunctuation)
 					{
-						if (checkWord == word)
+						word = string.Format("{0}{1}", char.ToUpper(currentWord.Word[0]), currentWord.Word.Substring(1));
+						lastPunctuation = false;
+					}
+					message = string.Format("{0} {1}", message, word);
+				}
+				length++;
+
+				if (currentWord.SentanceEnd && _random.NextDouble() > 0.80d)
+				{
+					string[] wordEnds = { ".", "!", "?" };
+					message = string.Format("{0}{1}", message, wordEnds[_random.Next(0, wordEnds.Length - 1)]);
+					break;
+				} else if (currentWord.Punctuate && _random.NextDouble() > 0.80d && length > 3)
+				{
+					string[] punctuation = { ".", "!", "?", ":", ";", "'s", "..."};
+					message = string.Format("{0}{1}", message, punctuation[_random.Next(0, punctuation.Length - 1)]);
+					lastPunctuation = true;
+				}
+
+				var words = currentWord.Words.Keys.ToList();
+				if (words.Count() > 0)
+				{
+					var wordToPick = words[_random.Next(0, words.Count())];
+
+					currentWord = _learning.GetWord(wordToPick);
+
+					if (lastPunctuation)
+					{
+
+						if (currentWord.Words.Count() == 0)
 						{
-							// If a word is repeated too much there's a bigger chance there's going to be a different word next.
-							if (repetition > 0 && _random.NextDouble() > 1 / repetition)
-							{
-								choice = _random.Next(0, Math.Max(max - repetition, 0));
-								continue;
-							}
-
-							repetition++;
-						}
-						// Attempt to reduce repeated sections.
-						else if (message.Contains(checkWord) && !message.EndsWith(checkWord, StringComparison.OrdinalIgnoreCase))
-						{
-							var index = message.LastIndexOf(checkWord, StringComparison.OrdinalIgnoreCase);
-							var subString = message.Substring(index, message.Length - index);
-
-							if (latestSubString.EndsWith(subString, StringComparison.OrdinalIgnoreCase))
-							{
-								latestSubString = string.Empty;
-								choice = _random.Next(0, Math.Max(max - repetition, 0));
-								continue;
-							}
-
+							break;
 						}
 						else
 						{
-							repetition = 0;
-							//latestSubString = string.Empty;
-						}
 
-						word = checkWord;
-						break;
+							if (referenceWords.Length != usedReferences.Count())
+							{
+								int attempts = 0;
+								do
+								{
+									currentWord = _learning.GetWord(referenceWords[_random.Next(0, referenceWords.Length - 1)]);
+									attempts++;
+								} while (attempts < 10 && usedReferences.Contains(currentWord.Word));
+
+								if (attempts >= 10 )
+								{
+									currentWord = null;
+								}
+							}
+						}
 					}
 				}
+			} while (currentWord != null && currentWord.Words.Count() > 0);
 
-				message += $" {word}";
-				latestSubString += $" {word}";
-				latestSubString = latestSubString.Trim();
-			}
-
-			if (message.Length > 3)
-			{
-				message = message[0].ToString().ToUpper() + message.Substring(1, message.Length - 2);
-			}
-
-			if (!message.EndsWith(".", StringComparison.Ordinal)) message += ".";
 
 			return message;
-		}
-
-		public async Task LearnFromString(string message)
-		{
-			var words = message.Trim().Split(new char[] { ' ', '\t', '\n' });
-
-			for (int i = 0; i < words.Length; i++)
-			{
-				var word = words[i].Trim();
-				var nextWord = i < words.Length - 1 ? words[i + 1] : string.Empty;
-
-				if (wordData.ContainsKey(word))
-				{
-					wordData[word].AddWord(nextWord);
-				}
-				else
-				{
-					var newWordSet = new WordSet(word);
-					newWordSet.AddWord(nextWord);
-
-					wordData[word] = newWordSet;
-				}
-			}
-			SetDirty();
 		}
 
 		public async Task LearnChannelHistory(ITextChannel channel)
@@ -228,39 +181,46 @@ namespace OratorChan.Bot.Communication
 				_client.GuildData.Channels[channel.Id] = new ChannelData
 				{
 					lastMessageLearned = lastMessage.Id,
-					oldestMessageLearned = lastMessage.Id
+					oldestMessageLearned = lastMessage.Id,
+					learn = true
 				};
+				_client.GuildData.Save();
+			} else
+			{
+				_client.GuildData.Channels[channel.Id].learn = true;
 			}
 
 			var channelData = _client.GuildData.Channels[channel.Id];
 
-			while (!channelData.hasOldestMessage)
+			await Task.Run(() =>
 			{
-				var messages = await channel.GetMessagesAsync(channelData.oldestMessageLearned, Direction.Before).FlattenAsync();
-
-				if (!messages.Any())
+				while (!channelData.hasOldestMessage)
 				{
-					channelData.hasOldestMessage = true;
+					var messages = channel.GetMessagesAsync(channelData.oldestMessageLearned, Direction.Before).FlattenAsync().Result;
 
-					await channel.SendMessageAsync($"Succesfully learned full channel history!");
+					if (!messages.Any())
+					{
+						channelData.hasOldestMessage = true;
 
-					SetDirty();
+						channel.SendMessageAsync($"Succesfully learned full channel history!");
 
-					break;
+						break;
+					}
+
+					foreach (var msg in messages)
+					{
+						if (msg.Author.Id == _client.CurrentUser.Id) continue;
+
+						Task.WaitAll(_learning.LearnFromString(msg.Content));
+
+						messagesLearned++;
+					}
+
+					channelData.oldestMessageLearned = messages.Last().Id;
+					_learning.SetDirty();
+					Console.WriteLine($"Learned from {messagesLearned} messages.");
 				}
-
-				foreach (var msg in messages)
-				{
-					if (msg.Author.Id == _client.CurrentUser.Id) continue;
-
-					await LearnFromString(msg.Content);
-
-					messagesLearned++;
-				}
-
-				channelData.oldestMessageLearned = messages.Last().Id;
-				Console.WriteLine($"Learned from {messagesLearned} messages.");
-			}
+			});
 		}
 
 		public async Task LearnFromChannel(ITextChannel channel)
@@ -279,27 +239,35 @@ namespace OratorChan.Bot.Communication
 
 			var channelData = _client.GuildData.Channels[channel.Id];
 
-			var newerMessages = await channel.GetMessagesAsync(channelData.lastMessageLearned, Direction.After).FlattenAsync();
+			var newerMessages = channel.GetMessagesAsync(channelData.lastMessageLearned, Direction.After).FlattenAsync().Result;
 
-			while (newerMessages.Any())
+			await Task.Run(() =>
 			{
-				Console.WriteLine($"Learning from {newerMessages.Count()} messages.");
-
-				foreach (var msg in newerMessages)
+				while (newerMessages.Any())
 				{
-					if (msg.Author.Id == _client.CurrentUser.Id) continue;
+					Console.WriteLine($"Learning from {newerMessages.Count()} messages.");
 
-					await LearnFromString(msg.Content);
+					foreach (var msg in newerMessages)
+					{
+						if (msg.Author.Id == _client.CurrentUser.Id) continue;
+
+						Task.Run(() => _learning.LearnFromString(msg.Content));
+						_learning.SetDirty();
+					}
+
+					channelData.lastMessageLearned = newerMessages.Last().Id;
+
+					newerMessages = channel.GetMessagesAsync(channelData.lastMessageLearned, Direction.After).FlattenAsync().Result;
 				}
-
-				channelData.lastMessageLearned = newerMessages.Last().Id;
-				SetDirty();
-
-				newerMessages = await channel.GetMessagesAsync(channelData.lastMessageLearned, Direction.After).FlattenAsync();
-			}
+			});
 		}
 
         public async Task LearnNewMessages() {
+			if (_client.GuildData.BaseChannel < 1)
+			{
+				return;
+			}
+
             var guild = _client.Guilds.FirstOrDefault(x => x.Id == _client.GuildData.Guild);
             var baseChannel = guild.GetTextChannel(_client.GuildData.BaseChannel) as ITextChannel;
 
@@ -310,8 +278,6 @@ namespace OratorChan.Bot.Communication
 
                 await LearnFromChannel(channel);
             }
-
-            SetDirty();
         }
     }
 }

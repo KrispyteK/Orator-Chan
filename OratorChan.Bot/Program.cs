@@ -69,8 +69,9 @@ namespace OratorChan.Bot {
 				{
 					return (T) _serializer.Deserialize(file, typeof(T));
 				}
-			} catch
+			} catch (Exception e)
 			{
+				Console.WriteLine(e.Message);
 				return (T) defaultValue;
 			}
 
