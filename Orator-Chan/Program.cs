@@ -9,9 +9,6 @@ using Newtonsoft.Json.Linq;
 namespace OratorChan {
     class Program {
         private Client _client;
-        private CommandHandler _commandHandler;
-        private OratorCommandService _commandService;
-        private CommunicationHandler _communicationHandler;
 
         public static void Main(string[] args)
             => new Program().MainAsync().GetAwaiter().GetResult();
@@ -20,15 +17,16 @@ namespace OratorChan {
             _client = new Client();
 
             _client.Config = RetrieveConfig();
+            _client.GuildData = RetrieveGuildData();
             _client.Log += Log;
             _client.MessageReceived += MessageReceived;
 
-            _commandService = new OratorCommandService();
-            _commandHandler = new CommandHandler(_client, _commandService);
+            _client.CommandService = new OratorCommandService();
+            _client.CommandHandler = new CommandHandler(_client, _client.CommandService);
 
-            await _commandHandler.InstallCommandsAsync();
+            await _client.CommandHandler.InstallCommandsAsync();
 
-            _communicationHandler = new CommunicationHandler(_client);
+            _client.CommunicationHandler = new CommunicationHandler(_client);
 
             await _client.LoginAsync(TokenType.Bot, _client.Config.Token);
             await _client.StartAsync();
@@ -55,6 +53,13 @@ namespace OratorChan {
             using (StreamReader file = File.OpenText(@$"{Environment.CurrentDirectory}\Resources\config.json"))
             using (JsonTextReader reader = new JsonTextReader(file)) {
                 return JToken.ReadFrom(reader).ToObject<Configuration>();
+            }
+        }
+
+        private GuildData RetrieveGuildData() {
+            using (StreamReader file = File.OpenText(@$"{Environment.CurrentDirectory}\Resources\guilddata.json"))
+            using (JsonTextReader reader = new JsonTextReader(file)) {
+                return JToken.ReadFrom(reader).ToObject<GuildData>();
             }
         }
     }
