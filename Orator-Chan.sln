@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29409.12
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orator-Chan", "Orator-Chan.csproj", "{C84E9969-97DD-4A95-86DA-74C1D4011030}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OratorChan.Bot", "OratorChan.Bot\OratorChan.Bot.csproj", "{C84E9969-97DD-4A95-86DA-74C1D4011030}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

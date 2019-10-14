@@ -4,7 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 #local config file
-Resources/config.json
+**/Resources/config.json
 
 # User-specific files
 *.rsuser
