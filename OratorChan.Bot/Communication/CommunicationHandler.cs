@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace OratorChan.Bot.Communication
@@ -16,49 +17,38 @@ namespace OratorChan.Bot.Communication
 	public class CommunicationHandler
 	{
 		public Dictionary<string, WordSet> wordData;
+		private bool _dirtyData;
 
 		private readonly Client _client;
-		private readonly Random _random;
-		private bool _hasData;
-		private int _saveInterval = 5;
-		private int _messagesSinceSave = 0;
+		private readonly Random _random = new Random();
+		private readonly Timer _timer;
 
 		public CommunicationHandler(Client client)
 		{
-			wordData = new Dictionary<string, WordSet>();
-			_random = new Random();
-
 			_client = client;
 			_client.MessageReceived += HandleMessageAsync;
+
+			wordData = Program.GetResource<Dictionary<string, WordSet>>("Data", new Dictionary<string, WordSet>());
+			_timer = new Timer(new TimerCallback(SaveData), this, 1000, 10000);
 		}
 
-		private async Task SaveData()
+		private static void SaveData(object communicationHandler)
 		{
-			using (StreamWriter file = File.CreateText(@$"{Environment.CurrentDirectory}\Resources\data.json"))
+			var state = communicationHandler as CommunicationHandler;
+			if (!state._dirtyData)
 			{
-				JsonSerializer serializer = new JsonSerializer();
-				serializer.Serialize(file, wordData);	
+				return;
 			}
+
+			Program.SaveResource("Data", state.wordData);
+			Program.SaveResource(state._client.GuildData);
+
+			state._dirtyData = false;
 		}
 
-		private async Task SaveGuildData()
+		public void SetDirty()
 		{
-			using (StreamWriter file = File.CreateText(@$"{Environment.CurrentDirectory}\Resources\guilddata.json"))
-			{
-				JsonSerializer serializer = new JsonSerializer();
-				serializer.Serialize(file, _client.GuildData);
-			}
-		}
-
-		private async Task GetData()
-		{
-			using (StreamReader file = File.OpenText(@$"{Environment.CurrentDirectory}\Resources\data.json"))
-			using (JsonTextReader reader = new JsonTextReader(file))
-			{
-				wordData = JToken.ReadFrom(reader).ToObject<Dictionary<string, WordSet>>();
-			}
-
-			_hasData = true;
+			_dirtyData = true;
 		}
 
 		private void SetLatestMessage(IMessage message)
@@ -84,11 +74,6 @@ namespace OratorChan.Bot.Communication
 
 			if (message.Author.Id == _client.CurrentUser.Id) return;
 
-			if (!_hasData)
-			{
-				await GetData();
-			}
-
 			if (_client.Config.LearningChannels.Contains(message.Channel.Id))
 			{
 
@@ -111,15 +96,6 @@ namespace OratorChan.Bot.Communication
 				var constructedMessage = ConstructMessage(message.Content.Split(' '));
 
 				await message.Channel.SendMessageAsync(constructedMessage);
-			}
-
-			_messagesSinceSave++;
-
-			if (_messagesSinceSave == _saveInterval)
-			{
-				await SaveData();
-
-				_saveInterval = 0;
 			}
 		}
 
@@ -177,12 +153,12 @@ namespace OratorChan.Bot.Communication
 							repetition++;
 						}
 						// Attempt to reduce repeated sections.
-						else if (message.Contains(checkWord) && !message.EndsWith(checkWord))
+						else if (message.Contains(checkWord) && !message.EndsWith(checkWord, StringComparison.OrdinalIgnoreCase))
 						{
-							var index = message.LastIndexOf(checkWord);
+							var index = message.LastIndexOf(checkWord, StringComparison.OrdinalIgnoreCase);
 							var subString = message.Substring(index, message.Length - index);
 
-							if (latestSubString.EndsWith(subString))
+							if (latestSubString.EndsWith(subString, StringComparison.OrdinalIgnoreCase))
 							{
 								latestSubString = string.Empty;
 								choice = _random.Next(0, Math.Max(max - repetition, 0));
@@ -211,7 +187,7 @@ namespace OratorChan.Bot.Communication
 				message = message[0].ToString().ToUpper() + message.Substring(1, message.Length - 2);
 			}
 
-			if (!message.EndsWith(".")) message += ".";
+			if (!message.EndsWith(".", StringComparison.Ordinal)) message += ".";
 
 			return message;
 		}
@@ -237,6 +213,7 @@ namespace OratorChan.Bot.Communication
 					wordData[word] = newWordSet;
 				}
 			}
+			SetDirty();
 		}
 
 		public async Task LearnChannelHistory(ITextChannel channel)
@@ -266,8 +243,7 @@ namespace OratorChan.Bot.Communication
 
 					await channel.SendMessageAsync($"Succesfully learned full channel history!");
 
-					await SaveGuildData();
-					await SaveData();
+					SetDirty();
 
 					break;
 				}
@@ -316,6 +292,7 @@ namespace OratorChan.Bot.Communication
 				}
 
 				channelData.lastMessageLearned = newerMessages.Last().Id;
+				SetDirty();
 
 				newerMessages = await channel.GetMessagesAsync(channelData.lastMessageLearned, Direction.After).FlattenAsync();
 			}
