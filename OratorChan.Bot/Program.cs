@@ -36,8 +36,6 @@ namespace OratorChan.Bot {
             await _client.LoginAsync(TokenType.Bot, _client.Config.Token);
             await _client.StartAsync();
 
-            _client.Ready += _client.CommunicationHandler.LearnNewMessages;
-
             // Block this task until the program is closed.
             await Task.Delay(-1);
         }
