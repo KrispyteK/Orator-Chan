@@ -5,8 +5,12 @@ using System.IO;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using OratorChan.Bot.Commands;
+using OratorChan.Bot.Communication;
+using OratorChan.Bot.Config;
+using OratorChan.Bot.Data;
 
-namespace OratorChan {
+namespace OratorChan.Bot {
     class Program {
         private Client _client;
 
@@ -16,8 +20,8 @@ namespace OratorChan {
         public async Task MainAsync () {
             _client = new Client();
 
-            _client.Config = RetrieveConfig();
-            _client.GuildData = RetrieveGuildData();
+            _client.Config = GetResource<Configuration>("config");
+            _client.GuildData = GetResource<GuildData>("guilddata");
             _client.Log += Log;
             _client.MessageReceived += MessageReceived;
 
@@ -51,18 +55,11 @@ namespace OratorChan {
             //}
         }
 
-        private Configuration RetrieveConfig () {
-            using (StreamReader file = File.OpenText(@$"{Environment.CurrentDirectory}\Resources\config.json"))
-            using (JsonTextReader reader = new JsonTextReader(file)) {
-                return JToken.ReadFrom(reader).ToObject<Configuration>();
-            }
-        }
+		private T GetResource<T>(string resource)
+		{
 
-        private GuildData RetrieveGuildData() {
-            using (StreamReader file = File.OpenText(@$"{Environment.CurrentDirectory}\Resources\guilddata.json"))
-            using (JsonTextReader reader = new JsonTextReader(file)) {
-                return JToken.ReadFrom(reader).ToObject<GuildData>();
-            }
-        }
+			string fileContent = File.ReadAllText(@$"{Environment.CurrentDirectory}\Resources\{resource}.json");
+			return JsonConvert.DeserializeObject<T>(fileContent);
+		}
     }
 }
