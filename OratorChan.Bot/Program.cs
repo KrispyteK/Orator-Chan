@@ -4,7 +4,6 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using OratorChan.Bot.Commands;
 using OratorChan.Bot.Communication;
 using OratorChan.Bot.Config;
@@ -13,15 +12,17 @@ using OratorChan.Bot.Data;
 namespace OratorChan.Bot {
     class Program {
         private Client _client;
+		private static JsonSerializer _serializer = new JsonSerializer();
 
-        public static void Main(string[] args)
+
+		public static void Main(string[] args)
             => new Program().MainAsync().GetAwaiter().GetResult();
 
         public async Task MainAsync () {
             _client = new Client();
 
-            _client.Config = GetResource<Configuration>("config");
-            _client.GuildData = GetResource<GuildData>("guilddata");
+            _client.Config = GetResource<Configuration>(null);
+            _client.GuildData = GetResource<GuildData>(new GuildData());
             _client.Log += Log;
             _client.MessageReceived += MessageReceived;
 
@@ -47,19 +48,52 @@ namespace OratorChan.Bot {
         }
 
         private async Task MessageReceived(SocketMessage message) {
-            //if (message.Content.StartsWith(config.Prefix)) {
+			//if (message.Content.StartsWith(config.Prefix)) {
 
-            //    if (message.Content == "!ping") {
-            //        await message.Channel.SendMessageAsync("Pong!");
-            //    }
-            //}
-        }
-
-		private T GetResource<T>(string resource)
-		{
-
-			string fileContent = File.ReadAllText(@$"{Environment.CurrentDirectory}\Resources\{resource}.json");
-			return JsonConvert.DeserializeObject<T>(fileContent);
+			//    if (message.Content == "!ping") {
+			//        await message.Channel.SendMessageAsync("Pong!");
+			//    }
+			//}
 		}
-    }
+
+		public static T GetResource<T>(string name, object defaultValue)
+		{
+			string path = Path.Combine(Environment.CurrentDirectory, "Resources", string.Format("{0}.json", name));
+
+			if (!File.Exists(path))
+			{
+				return (T) defaultValue;
+			}
+
+			try
+			{
+				using (StreamReader file = File.OpenText(path))
+				{
+					return (T) _serializer.Deserialize(file, typeof(T));
+				}
+			} catch
+			{
+				return (T) defaultValue;
+			}
+
+		}
+
+		public static T GetResource<T>(object defaultValue)
+		{
+			return GetResource<T>(typeof(T).Name, defaultValue);
+		}
+
+		public static void SaveResource(string name, object resource)
+		{
+			using (StreamWriter file = File.CreateText(Path.Combine(Environment.CurrentDirectory, "Resources", string.Format("{0}.json", name))))
+			{
+				_serializer.Serialize(file, resource);
+			}
+		}
+
+		public static void SaveResource(object resource)
+		{
+			SaveResource(resource.GetType().Name, resource);
+		}
+	}
 }
