@@ -21,7 +21,7 @@ namespace OratorChan.Bot {
             _client = new Client();
 
             _client.Config = GetResource<Configuration>("config");
-            _client.GuildData = GetResource<GuildData>("config");
+            _client.GuildData = GetResource<GuildData>("guilddata");
             _client.Log += Log;
             _client.MessageReceived += MessageReceived;
 
