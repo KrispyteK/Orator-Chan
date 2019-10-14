@@ -10,5 +10,7 @@ namespace OratorChan {
         public ulong[] LearningChannels { get; set; }
         public ulong[] ReplyChannels { get; set; }
         public ulong[] Admins { get; set; }
+        public ulong BaseChannel { get; set; }
+        public ulong GuildID { get; set; }
     }
 } 

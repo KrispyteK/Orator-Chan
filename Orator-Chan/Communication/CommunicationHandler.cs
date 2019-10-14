@@ -273,5 +273,21 @@ namespace OratorChan {
                 newerMessages = await channel.GetMessagesAsync(channelData.lastMessageLearned, Direction.After).FlattenAsync();
             }
         }
+
+        public async Task LearnNewMessages () {
+            var guild = _client.Guilds.FirstOrDefault(x => x.Id == _client.Config.GuildID);
+            var baseChannel = guild.GetTextChannel(_client.Config.BaseChannel) as ITextChannel;
+
+            foreach (var kv in _client.GuildData.Channels) {
+                var channel = guild.GetTextChannel(kv.Key) as ITextChannel;
+
+                await baseChannel.SendMessageAsync($"Learning new messages from {channel.Name}");
+
+                await LearnFromChannel(channel);
+            }
+
+            SaveData();
+            SaveGuildData();
+        }
     }
 }
